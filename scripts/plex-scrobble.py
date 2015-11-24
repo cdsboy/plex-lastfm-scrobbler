@@ -96,7 +96,8 @@ if __name__ == '__main__':
         'session': os.path.expanduser('~/.config/plex-lastfm-scrobbler/session_key'),
         'mediaserver_url': 'http://localhost:32400',
         'mediaserver_log_location': platform_log_directory(),
-        'log_file': '/tmp/plex_scrobble.log'
+        'log_file': '/tmp/plex_scrobble.log',
+        'account_name': None
       })
 
     # ISSUE https://github.com/jesseward/plex-lastfm-scrobbler/issues/34

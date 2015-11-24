@@ -9,8 +9,9 @@ import time
 from lastfm import LastFm
 from scrobble_cache import ScrobbleCache
 
+account_id = None
 
-def parse_line(log_line):
+def parse_line(log_line, account_name):
     """
     Matches known audio metadata log entries entries against input (log_line)
     
@@ -21,19 +22,48 @@ def parse_line(log_line):
 
     logger = logging.getLogger(__name__)
 
-    REGEX = [
-        # universal-transcoder
-        re.compile('.*GET\s\/music\/:\/transcode\/universal\/start\.mp3.*metadata%2F(\d+)\&.*'),
-        # stream based transcoder 
-        re.compile('.*\sDEBUG\s-\sLibrary\sitem\s(\d+)\s\'.*\'\sgot\splayed\sby\saccount.*')
-    ]
+    global account_id
+    
+    if account_name is not None:
+        regex = re.compile('.*User\sis\s([a-zA-Z0-9]+)\s\(ID:\s(\d+)\)')
 
-    for regex in REGEX:
         m = regex.match(log_line)
 
         if m:
-            logger.info('Found played song and extracted library id \'{l_id}\' from plex log '.format(l_id=m.group(1)))
-            return m.group(1)
+            if m.group(1) == account_name:
+                if account_id == m.group(2):
+                    return
+                logger.info('Found user \'{user}\' with id {u_id} from plex log'.format(user=m.group(1), u_id=m.group(2)))
+                account_id = m.group(2)
+            return
+    
+    if account_name is not None and account_id is None:
+        return
+    
+    # TODO: figure out universal-transcoder
+    #REGEX = [
+    #    # universal-transcoder
+    #    re.compile('.*GET\s\/music\/:\/transcode\/universal\/start\.mp3.*metadata%2F(\d+)\&.*'),
+    #    # stream based transcoder 
+    #    re.compile('.*\sDEBUG\s-\sLibrary\sitem\s(\d+)\s\'.*\'\sgot\splayed\sby\saccount\s(\d+).*')
+    #]
+
+    #for regex in REGEX:
+    #    m = regex.match(log_line)
+
+    #    if m:
+    #        logger.info('Found played song and extracted library id \'{l_id}\' from plex log '.format(l_id=m.group(1)))
+    #        return m.group(1)
+
+    regex = re.compile('.*\sDEBUG\s-\sLibrary\sitem\s(\d+)\s\'.*\'\sgot\splayed\sby\saccount\s(\d+).*')
+    m = regex.match(log_line)
+    if m:
+        logger.info('Found played song and extracted library id \'{l_id}\' and user id \'{u_id}\' from plex log '.format(l_id=m.group(1), u_id=m.group(2)))
+        if account_id is not None and m.group(2) != account_id:
+            return
+
+        logger.info('Found played song and extracted library id \'{l_id}\' from plex log '.format(l_id=m.group(1)))
+        return m.group(1)
 
 
 def fetch_metadata(l_id, config):
@@ -102,6 +132,8 @@ def monitor_log(config):
         return
     f.seek(0, 2)
 
+    account_name = config.get('plex-scrobble', 'account_name')
+
     while True:
 
         time.sleep(.03)
@@ -133,7 +165,7 @@ def monitor_log(config):
         # based on a regex value. If we have a match, extract the media file
         # id and send it off to last.fm for scrobble.
         if line:
-            played = parse_line(line)
+            played = parse_line(line, account_name)
 
             if not played: continue
 
